@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="styles.css" rel="stylesheet">
+    <title>Todo List App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #taskList {
+            margin-top: 20px;
+        }
+        .task-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .priority-high { color: red; }
+        .priority-medium { color: orange; }
+        .priority-low { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Todo List</h1>
+    
+    <div>
+        <input type="text" id="taskInput" placeholder="Enter task">
+        <input type="datetime-local" id="dateInput">
+        <select id="prioritySelect">
+            <option value="auto">Auto Priority</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+        </select>
+        <button id="addTaskBtn">Add Task</button>
+    </div>
+
+    <div>
+        <button class="filter-btn" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="high">High</button>
+        <button class="filter-btn" data-filter="medium">Medium</button>
+        <button class="filter-btn" data-filter="low">Low</button>
+    </div>
+
+    <div id="taskList"></div>
+
+    <script>
+        // Linked List Implementation
+        class Node {
+            constructor(task, date, priority) {
+                this.task = task;
+                this.date = date;
+                this.priority = priority;
+                this.next = null;
+            }
+        }
+
+        class TaskLinkedList {
+            constructor() {
+                this.head = null;
+            }
+
+            addTask(task, date, priority) {
+                const newNode = new Node(task, date, priority);
+                
+                if (!this.head) {
+                    this.head = newNode;
+                    return;
+                }
+
+                let current = this.head;
+                while (current.next) {
+                    current = current.next;
+                }
+                current.next = newNode;
+            }
+
+            deleteTask(task) {
+                if (!this.head) return;
+
+                if (this.head.task === task) {
+                    this.head = this.head.next;
+                    return;
+                }
+
+                let current = this.head;
+                while (current.next) {
+                    if (current.next.task === task) {
+                        current.next = current.next.next;
+                        return;
+                    }
+                    current = current.next;
+                }
+            }
+
+            getAllTasks() {
+                const tasks = [];
+                let current = this.head;
+                
+                while (current) {
+                    tasks.push({
+                        task: current.task,
+                        date: current.date,
+                        priority: current.priority
+                    });
+                    current = current.next;
+                }
+                
+                return tasks;
+            }
+        }
+
+        // Priority ML Class
+        class TaskPriorityML {
+            calculatePriority(dateString) {
+                const taskDate = new Date(dateString);
+                const currentDate = new Date();
+                const diffDays = Math.ceil((taskDate - currentDate) / (1000 * 60 * 60 * 24));
+
+                if (diffDays <= 3) {
+                    return "high";
+                } else if (diffDays <= 7) {
+                    return "medium";
+                } else {
+                    return "low";
+                }
+            }
+        }
+
+        // Main Application Logic
+        document.addEventListener('DOMContentLoaded', () => {
+            const taskList = new TaskLinkedList();
+            const mlPriority = new TaskPriorityML();
+
+            const taskInput = document.getElementById('taskInput');
+            const dateInput = document.getElementById('dateInput');
+            const prioritySelect = document.getElementById('prioritySelect');
+            const addTaskBtn = document.getElementById('addTaskBtn');
+            const taskListElement = document.getElementById('taskList');
+            const filterButtons = document.querySelectorAll('.filter-btn');
+
+            let currentFilter = 'all';
+
+            addTaskBtn.addEventListener('click', () => {
+                if (!taskInput.value || !dateInput.value) {
+                    alert('Please fill all fields');
+                    return;
+                }
+
+                const priority = prioritySelect.value === 'auto' 
+                    ? mlPriority.calculatePriority(dateInput.value) 
+                    : prioritySelect.value;
+
+                taskList.addTask(taskInput.value, dateInput.value, priority);
+                updateTaskDisplay();
+
+                // Reset inputs
+                taskInput.value = '';
+                dateInput.value = '';
+            });
+
+            filterButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    currentFilter = button.getAttribute('data-filter');
+                    
+                    // Remove active class from all buttons
+                    filterButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+
+                    updateTaskDisplay();
+                });
+            });
+
+            function updateTaskDisplay() {
+                taskListElement.innerHTML = '';
+                
+                const tasks = taskList.getAllTasks();
+                const filteredTasks = tasks.filter(task => 
+                    currentFilter === 'all' || task.priority === currentFilter
+                );
+
+                filteredTasks.forEach(task => {
+                    const taskElement = document.createElement('div');
+                    taskElement.className = 'task-item';
+                    
+                    const date = new Date(task.date).toLocaleString();
+                    
+                    taskElement.innerHTML = `
+                        <div>
+                            <span>${task.task}</span>
+                            <span> (${date})</span>
+                        </div>
+                        <div>
+                            <span class="priority-${task.priority}">${task.priority}</span>
+                            <button onclick="deleteTask('${task.task}')">Delete</button>
+                        </div>
+                    `;
+                    
+                    taskListElement.appendChild(taskElement);
+                });
+            }
+
+            // Global function for delete (since it's in the global scope)
+            window.deleteTask = (task) => {
+                taskList.deleteTask(task);
+                updateTaskDisplay();
+            };
+        });
+    </script>
+</body>
+</html>
